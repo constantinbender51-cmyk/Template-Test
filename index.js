@@ -38,36 +38,40 @@ await pool.query(`
 
 /* ---------- 2. CANDLES ---------- */
 app.get('/candles-full', async (_req, res) => {
-  const start = new Date('2013-01-01');
-  const now   = new Date();
+  const symbol = 'BTCUSDT';
+  const interval = '1d';
+  const start = new Date('2013-01-01').getTime();  // Binance starts 2017-08-17
+  const end   = new Date().getTime();
+
+  const limit = 1000;                      // max rows per call
   let totalInserted = 0;
   let totalRows     = 0;
 
-  /* Break into 365-day blocks */
-  for (let d = new Date(start); d < now; d.setDate(d.getDate() + 365)) {
-    const end = new Date(Math.min(d.getTime() + 365 * 86400000, now.getTime()));
-    const days = Math.ceil((end - d) / 86400000); // max 365
-
+  /* walk forward 1000 days at a time */
+  for (let t = start; t < end; t += limit * 86400000) {
     const url =
-      `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart` +
-      `?vs_currency=usd&days=${days}&interval=daily`;
+      `https://api.binance.com/api/v3/klines` +
+      `?symbol=${symbol}&interval=${interval}` +
+      `&startTime=${t}&endTime=${Math.min(t + limit * 86400000, end)}&limit=${limit}`;
 
     const { data } = await axios.get(url);
-    const prices  = data.prices;   // [[time,close], ...]
-    const volumes = data.total_volumes;
 
-    for (const [ts, close] of prices.reverse()) { // oldest→newest
-      const date = new Date(ts).toISOString().split('T')[0];
-      const vol  = volumes.find(v => v[0] === ts)?.[1] || 0;
+    for (const k of data) {
+      const date  = new Date(k[0]).toISOString().split('T')[0]; // k[0] = open time
+      const open  = Number(k[1]);
+      const high  = Number(k[2]);
+      const low   = Number(k[3]);
+      const close = Number(k[4]);
+      const vol   = Number(k[5]);
+
       const { rowCount } = await pool.query(`
         INSERT INTO btc_candles (date, open, high, low, close, volume)
-        VALUES ($1,$2,$2,$2,$3,$4) ON CONFLICT (date) DO NOTHING`,
-        [date, close, close, vol]
+        VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (date) DO NOTHING`,
+        [date, open, high, low, close, vol]
       );
       totalInserted += rowCount;
     }
-    totalRows += prices.length;
-    await sleep(6000);
+    totalRows += data.length;
   }
 
   res.json({ inserted: totalInserted, total: totalRows });
