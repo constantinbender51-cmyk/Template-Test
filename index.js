@@ -129,23 +129,16 @@ app.get('/signals', async (_req, res) => {
       volume:Number(r.volume)
     }));
 const prompt = `
-You are a pattern analyst.  
-Below are the last N daily candles (oldest → newest) from Binance:
-
+Summarize this data: 
 ${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
 
-Tasks:
-1. Identify the dominant price pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
-2. Predict the next 1-day direction: UP / DOWN / NEUTRAL.
-3. Provide confidence % (0-100).
-4. One-sentence rationale.
+Decide BUY SELL or HOLD.
 
 Return strict JSON:
 {
-  "pattern": "<name>",
-  "prediction": "UP|DOWN|NEUTRAL",
+  "prediction": "BUY|SELL|HOLD",
   "confidence": 0-100,
-  "rationale": "<reason>"
+  "rationale": "<SUMMARY>"
 }
 `;
 
@@ -155,11 +148,9 @@ Return strict JSON:
     const parsed = JSON.parse(reply.response.text().replace(/```json|```/g,'').trim());
 
     /* 3. Trade only if confident */
-    
-    console.log({ prediction: parsed.prediction, confidence: parsed.confidence });
 
 let trade = null;
-if (parsed.confidence >= 80 && (parsed.prediction === 'UP' || parsed.prediction === 'DOWN')) {
+if (parsed.confidence >= 50 && (parsed.prediction === 'BUY' || parsed.prediction === 'SELL')) {
   const side = parsed.prediction;
   const order = await sendOrder(side, 0.0001);
   await pool.query(
