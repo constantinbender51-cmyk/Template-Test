@@ -137,6 +137,9 @@ Reply ONLY in JSON:
       reply.response.text().replace(/```json|```/g, '').trim()
     );
 
+    parsed.confidence = 100;
+    parsed.prediction = 'UP';
+    
     /* 4. Decide to trade */
     const { pattern, prediction, confidence } = parsed;
     let trade = null;
