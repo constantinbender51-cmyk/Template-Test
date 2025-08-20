@@ -140,8 +140,6 @@ Reply ONLY in JSON:
     /* 4. Decide to trade */
     const { pattern, prediction, confidence } = parsed;
     let trade = null;
-
-    confidence= 80;
     
     if (confidence >= 80) {
       const side = prediction === 'UP' ? 'BUY' : prediction === 'DOWN' ? 'SELL' : null;
