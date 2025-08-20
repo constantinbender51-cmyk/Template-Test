@@ -167,7 +167,7 @@ if (parsed.confidence >= 50 && (parsed.prediction === 'BUY' || parsed.prediction
   }
 });
 app.get('/reset-db', async (_req, res) => {
-  await pool.query('TRUNCATE btc_candles, kraken_orders, btc_signals');
+  await pool.query('TRUNCATE btc_candles, kraken_orders');
   res.json({ status: 'DB cleared' });
 });
 
