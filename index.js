@@ -175,17 +175,6 @@ app.get('/signals', async (_req, res) => {
   }
 });
 
-    /* 5. Respond */
-    res.json({
-      analysis: parsed,
-      trade
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /* ---------- 4. START ---------- */
 const PORT = process.env.PORT || 8080;
