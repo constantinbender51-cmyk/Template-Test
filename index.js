@@ -156,6 +156,8 @@ Return strict JSON:
 
     /* 3. Trade only if confident */
     let trade = null;
+    console.log({ prediction, confidence, shouldBuy });
+
     if (parsed.confidence >= 80) {
       const side = parsed.prediction === 'UP' ? 'BUY' : 'DOWN' ? 'SELL' : null;
       if (side) {
