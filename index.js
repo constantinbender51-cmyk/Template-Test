@@ -15,6 +15,27 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const app  = express();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+const prompt = `
+You are a pattern analyst.  
+Below are the last N daily candles (oldest → newest) from Binance:
+
+${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
+
+Tasks:
+1. Identify the dominant price pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
+2. Predict the next 1-day direction: UP / DOWN / NEUTRAL.
+3. Provide confidence % (0-100).
+4. One-sentence rationale.
+
+Return strict JSON:
+{
+  "pattern": "<name>",
+  "prediction": "UP|DOWN|NEUTRAL",
+  "confidence": 0-100,
+  "rationale": "<reason>"
+}
+`;
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- 1. DB AUTO-SETUP ---------- */
@@ -113,7 +134,7 @@ async function sendOrder(side, size = 0.0001) {
 /* Endpoint */
 app.get('/signals', async (_req, res) => {
   try {
-    /* 1. Load candles */
+    /* 1. Pull all Binance daily candles */
     const { rows } = await pool.query(`
       SELECT date, open, high, low, close, volume
       FROM btc_candles
@@ -121,61 +142,38 @@ app.get('/signals', async (_req, res) => {
     `);
     const candles = rows.map(r => ({
       date: r.date.toISOString().split('T')[0],
-      open: Number(r.open),
-      high: Number(r.high),
-      low:  Number(r.low),
-      close:Number(r.close),
+      open:  Number(r.open),
+      high:  Number(r.high),
+      low:   Number(r.low),
+      close: Number(r.close),
       volume:Number(r.volume)
     }));
 
-    /* 2. Build prompt */
-    const prompt = `
-You are a pattern-recognition bot.  
-Here are the last 52 daily candles (oldest → newest):
+    /* 2. Ask Gemini */
+    const model  = genAI.getGenerativeModel({ model:'gemini-1.5-flash' });
+    const reply  = await model.generateContent(prompt.replace('${candles.length}', candles.length));
+    const parsed = JSON.parse(reply.response.text().replace(/```json|```/g,'').trim());
 
-${JSON.stringify(candles, null, 0)}
-
-Tasks:
-1. Identify any recognizable pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
-2. State the current pattern name or "none".
-3. Predict the next 1-day direction: UP, DOWN, or NEUTRAL.
-4. Give a confidence % (0-100).
-
-Reply ONLY in JSON:
-{
-  "pattern": "<pattern name or none>",
-  "prediction": "UP|DOWN|NEUTRAL",
-  "confidence": <number 0-100>,
-  "reason": "<one-sentence rationale>"
-}
-`.trim();
-
-    /* 3. Ask Gemini */
-    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const reply  = await model.generateContent(prompt);
-    const parsed = JSON.parse(
-      reply.response.text().replace(/```json|```/g, '').trim()
-    );
-
-    parsed.confidence = 100;
-    parsed.prediction = 'UP';
-    
-    /* 4. Decide to trade */
-    const { pattern, prediction, confidence } = parsed;
+    /* 3. Trade only if confident */
     let trade = null;
-    
-    if (confidence >= 80) {
-      const side = prediction === 'UP' ? 'BUY' : prediction === 'DOWN' ? 'SELL' : null;
+    if (parsed.confidence >= 80) {
+      const side = parsed.prediction === 'UP' ? 'BUY' : 'DOWN' ? 'SELL' : null;
       if (side) {
         const order = await sendOrder(side, 0.0001);
         await pool.query(
-          `INSERT INTO kraken_orders(signal, order_id, created_at)
-           VALUES ($1, $2, NOW())`,
+          `INSERT INTO kraken_orders(signal, order_id, created_at) VALUES ($1,$2,NOW())`,
           [side, order.order_id]
         );
         trade = { side, order_id: order.order_id };
       }
     }
+
+    res.json({ analysis: parsed, trade });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
     /* 5. Respond */
     res.json({
