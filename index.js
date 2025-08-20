@@ -41,17 +41,20 @@ app.get('/candles-full', async (_req, res) => {
   let totalInserted = 0;
   let totalRows     = 0;
 
+  /* Break into 365-day blocks */
   for (let d = new Date(start); d < now; d.setDate(d.getDate() + 365)) {
     const end = new Date(Math.min(d.getTime() + 365 * 86400000, now.getTime()));
+    const days = Math.ceil((end - d) / 86400000); // max 365
+
     const url =
-      `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range` +
-      `?vs_currency=usd&from=${Math.floor(d / 1000)}&to=${Math.floor(end / 1000)}&interval=daily`;
+      `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart` +
+      `?vs_currency=usd&days=${days}&interval=daily`;
 
     const { data } = await axios.get(url);
-    const prices  = data.prices;
+    const prices  = data.prices;   // [[time,close], ...]
     const volumes = data.total_volumes;
 
-    for (const [ts, close] of prices) {
+    for (const [ts, close] of prices.reverse()) { // oldest→newest
       const date = new Date(ts).toISOString().split('T')[0];
       const vol  = volumes.find(v => v[0] === ts)?.[1] || 0;
       const { rowCount } = await pool.query(`
