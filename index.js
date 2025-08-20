@@ -175,7 +175,7 @@ if (parsed.confidence >= 80 && (parsed.prediction === 'UP' || parsed.prediction 
     res.status(500).json({ error: err.message });
   }
 });
-app.post('/reset-db', async (_req, res) => {
+app.get('/reset-db', async (_req, res) => {
   await pool.query('TRUNCATE btc_candles, kraken_orders, btc_signals');
   res.json({ status: 'DB cleared' });
 });
