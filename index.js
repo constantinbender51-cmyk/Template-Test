@@ -92,24 +92,78 @@ async function sendOrder(side, size = 0.0001) {
 
 /* Endpoint */
 app.get('/signals', async (_req, res) => {
-  const { rows } = await pool.query(
-    'SELECT close FROM btc_candles ORDER BY date ASC'
-  );
-  const closes = rows.map(r => Number(r.close));
+  try {
+    /* 1. Load candles */
+    const { rows } = await pool.query(`
+      SELECT date, open, high, low, close, volume
+      FROM btc_candles
+      ORDER BY date ASC
+    `);
+    const candles = rows.map(r => ({
+      date: r.date.toISOString().split('T')[0],
+      open: Number(r.open),
+      high: Number(r.high),
+      low:  Number(r.low),
+      close:Number(r.close),
+      volume:Number(r.volume)
+    }));
 
-  const prompt = `Last 52 daily BTC closes:\n${closes.join(',')}\nReply exactly BUY, SELL, or HOLD.`;
-  const model  = genAI.getGenerativeModel({ model:'gemini-1.5-flash' });
-  const signal = (await model.generateContent(prompt)).response.text().trim().toUpperCase();
+    /* 2. Build prompt */
+    const prompt = `
+You are a pattern-recognition bot.  
+Here are the last 52 daily candles (oldest → newest):
 
-  let order = null;
-  if (['BUY','SELL'].includes(signal)) {
-    order = await sendOrder(signal);
-    await pool.query(
-      'INSERT INTO kraken_orders(signal,order_id) VALUES ($1,$2)',
-      [signal, order.order_id]
+${JSON.stringify(candles, null, 0)}
+
+Tasks:
+1. Identify any recognizable pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
+2. State the current pattern name or "none".
+3. Predict the next 1-day direction: UP, DOWN, or NEUTRAL.
+4. Give a confidence % (0-100).
+
+Reply ONLY in JSON:
+{
+  "pattern": "<pattern name or none>",
+  "prediction": "UP|DOWN|NEUTRAL",
+  "confidence": <number 0-100>,
+  "reason": "<one-sentence rationale>"
+}
+`.trim();
+
+    /* 3. Ask Gemini */
+    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const reply  = await model.generateContent(prompt);
+    const parsed = JSON.parse(
+      reply.response.text().replace(/```json|```/g, '').trim()
     );
+
+    /* 4. Decide to trade */
+    const { pattern, prediction, confidence } = parsed;
+    let trade = null;
+
+    if (confidence >= 80) {
+      const side = prediction === 'UP' ? 'BUY' : prediction === 'DOWN' ? 'SELL' : null;
+      if (side) {
+        const order = await sendOrder(side, 0.0001);
+        await pool.query(
+          `INSERT INTO kraken_orders(signal, order_id, created_at)
+           VALUES ($1, $2, NOW())`,
+          [side, order.order_id]
+        );
+        trade = { side, order_id: order.order_id };
+      }
+    }
+
+    /* 5. Respond */
+    res.json({
+      analysis: parsed,
+      trade
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
-  res.json({ signal, order });
 });
 
 /* ---------- 4. START ---------- */
