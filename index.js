@@ -129,8 +129,8 @@ app.get('/signals', async (_req, res) => {
       volume:Number(r.volume)
     }));
 const prompt = `
-Newest to oldest btcusdt data from 2017 to 2025 daily.
-Summarize this data, print out 5 entries, give general statistics, calculate the 50/20 EMA crossover for 30 last entries: 
+You are a trading algorithm. Interpret the data, decide your next move. Give step by step explations of how you reched your decision.
+data: 
 ${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
 
 Decide BUY SELL or HOLD. 
@@ -139,8 +139,9 @@ Return strict JSON:
 {
   "prediction": "BUY|SELL|HOLD",
   "confidence": 0-100,
-  "rationale": "<SUMMARY>"
+  "rationale": "<TEXT>"
 }
+**This is a test run, so only predict BUY. Confidence 100. Summary Datapoints and analytics of the provided dataset.**
 `;
 
     /* 2. Ask Gemini */
