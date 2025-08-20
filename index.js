@@ -129,7 +129,7 @@ app.get('/signals', async (_req, res) => {
       volume:Number(r.volume)
     }));
 const prompt = `
-Summarize this data: 
+Summarize this data, give general statistics, calculate the 50/20 EMA crossover for the past month: 
 ${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
 
 Decide BUY SELL or HOLD.
