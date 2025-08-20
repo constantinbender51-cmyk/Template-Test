@@ -35,12 +35,13 @@ await pool.query(`
 `);
 
 /* ---------- 2. CANDLES ---------- */
-app.get('/candles', async (_req, res) => {
+app.get('/candles-full', async (_req, res) => {
+  const days = Math.floor((Date.now() - new Date('2013-01-01')) / 86400000);
   const { data } = await axios.get(
-    'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=52&interval=daily'
+    `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`
   );
-  const prices  = data.prices;
-  const volumes = data.total_volumes;
+  const prices = data.prices;          // [time, close]
+  const volumes = data.total_volumes;  // [time, volume]
 
   let inserted = 0;
   for (let i = 0; i < prices.length; i++) {
@@ -54,7 +55,7 @@ app.get('/candles', async (_req, res) => {
     );
     inserted += rowCount;
   }
-  res.json({ inserted });
+  res.json({ inserted, total: prices.length });
 });
 
 /* ---------- 3. SIGNAL + TRADE ---------- */
