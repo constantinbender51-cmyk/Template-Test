@@ -155,20 +155,19 @@ Return strict JSON:
     const parsed = JSON.parse(reply.response.text().replace(/```json|```/g,'').trim());
 
     /* 3. Trade only if confident */
-    let trade = null;
-    console.log({ prediction, confidence, shouldBuy });
+    
+    console.log({ prediction: parsed.prediction, confidence: parsed.confidence });
 
-    if (parsed.confidence >= 80) {
-      const side = parsed.prediction === 'UP' ? 'BUY' : 'DOWN' ? 'SELL' : null;
-      if (side) {
-        const order = await sendOrder(side, 0.0001);
-        await pool.query(
-          `INSERT INTO kraken_orders(signal, order_id, created_at) VALUES ($1,$2,NOW())`,
-          [side, order.order_id]
-        );
-        trade = { side, order_id: order.order_id };
-      }
-    }
+let trade = null;
+if (parsed.confidence >= 80 && (parsed.prediction === 'UP' || parsed.prediction === 'DOWN')) {
+  const side = parsed.prediction;
+  const order = await sendOrder(side, 0.0001);
+  await pool.query(
+    `INSERT INTO kraken_orders(signal, order_id, created_at) VALUES ($1,$2,NOW())`,
+    [side, order.order_id]
+  );
+  trade = { side, order_id: order.order_id };
+}
 
     res.json({ analysis: parsed, trade });
   } catch (err) {
