@@ -42,6 +42,7 @@ for (let d = start; d < now; d.setDate(d.getDate() + 365)) {
   const end = new Date(Math.min(d.getTime() + 365*86400000, now.getTime()));
   const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range` +
               `?vs_currency=usd&from=${d/1000}&to=${end/1000}&interval=daily`;
+}
   /* …insert same loop as above… */
   const { data } = await axios.get(url);
   const prices   = data.prices;
