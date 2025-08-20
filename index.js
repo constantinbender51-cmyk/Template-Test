@@ -15,26 +15,6 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const app  = express();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const prompt = `
-You are a pattern analyst.  
-Below are the last N daily candles (oldest → newest) from Binance:
-
-${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
-
-Tasks:
-1. Identify the dominant price pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
-2. Predict the next 1-day direction: UP / DOWN / NEUTRAL.
-3. Provide confidence % (0-100).
-4. One-sentence rationale.
-
-Return strict JSON:
-{
-  "pattern": "<name>",
-  "prediction": "UP|DOWN|NEUTRAL",
-  "confidence": 0-100,
-  "rationale": "<reason>"
-}
-`;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -148,6 +128,26 @@ app.get('/signals', async (_req, res) => {
       close: Number(r.close),
       volume:Number(r.volume)
     }));
+const prompt = `
+You are a pattern analyst.  
+Below are the last N daily candles (oldest → newest) from Binance:
+
+${candles.map(c => `Date:${c.date} O:${c.open} H:${c.high} L:${c.low} C:${c.close} V:${c.volume}`).join('\n')}
+
+Tasks:
+1. Identify the dominant price pattern (e.g., ascending triangle, double-bottom, bull-flag, etc.).
+2. Predict the next 1-day direction: UP / DOWN / NEUTRAL.
+3. Provide confidence % (0-100).
+4. One-sentence rationale.
+
+Return strict JSON:
+{
+  "pattern": "<name>",
+  "prediction": "UP|DOWN|NEUTRAL",
+  "confidence": 0-100,
+  "rationale": "<reason>"
+}
+`;
 
     /* 2. Ask Gemini */
     const model  = genAI.getGenerativeModel({ model:'gemini-1.5-flash' });
