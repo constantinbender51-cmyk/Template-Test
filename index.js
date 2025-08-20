@@ -17,17 +17,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/* inside /candles-full */
-for (let d = new Date(start); d < now; d.setDate(d.getDate() + 365)) {
-  /* …build url… */
-
-  const { data } = await axios.get(url);
-  /* …insert… */
-
-     // 6-second pause → safe under 10 req/min
-}
-
-
 /* ---------- 1. DB AUTO-SETUP ---------- */
 await pool.query(`
   CREATE TABLE IF NOT EXISTS btc_candles (
