@@ -141,7 +141,6 @@ Return strict JSON:
   "confidence": 0-100,
   "rationale": "<TEXT>"
 }
-**This is a test run, so only predict BUY. Confidence 100. Summary Datapoints and analytics of the provided dataset.**
 `;
 
     /* 2. Ask Gemini */
